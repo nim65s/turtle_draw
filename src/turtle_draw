@@ -5,6 +5,7 @@ from rclpy.node import Node
 from turtlesim.msg import Pose
 from turtlesim.srv import SetPen
 from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
 import cv2
 
 MAX = 10.99
@@ -22,11 +23,12 @@ class Drawer(Node):
         self.target = self.declare_parameter("target", "turtle1").value
         self.width = int(self.declare_parameter("width", "5").value)
 
+        self.bridge = CvBridge()
         self.image = None
         self.image_sub = self.create_subscription(
             Image, "/camera/image_raw", self.get_image, 1
         )
-        self.get_image(cv2.imread("HRP-2.jpg"))
+        self.set_image(cv2.imread("HRP-2.jpg"))
 
         # color
         self.pen_cli = self.create_client(SetPen, f"/{self.target}/set_pen")
@@ -45,8 +47,7 @@ class Drawer(Node):
         self.color.g = g
         self.color.b = b
 
-        self.future = self.pen_cli.call_async(self.color)
-        # rclpy.spin_until_future_complete(self, self.future)
+        self.pen_cli.call_async(self.color)
 
     def get_target_pose(self, msg):
         color = self.pose_to_color(msg)
@@ -62,7 +63,11 @@ class Drawer(Node):
         except IndexError:
             return x, y, 0
 
-    def get_image(self, image):
+    def get_image(self, imgmsg):
+        img = self.bridge.imgmsg_to_cv2(imgmsg, desired_encoding="passthrough")
+        self.set_image(img)
+
+    def set_image(self, image):
         c = max(image.shape) / RES
         image = cv2.resize(
             image,

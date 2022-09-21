@@ -13,6 +13,7 @@
   <depend>turtlesim</depend>
   <depend>image_pipeline</depend>
   <depend>python3-opencv</depend>
+  <depend>cv_bridge</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
