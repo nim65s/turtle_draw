@@ -11,6 +11,11 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
 
+# from rclpy.callback_groups import (
+# ReentrantCallbackGroup,
+# MutuallyExclusiveCallbackGroup,
+# )
+
 MAX = 10.99
 RES = 256
 
@@ -25,6 +30,8 @@ class Drawer(Node):
 
         self.target = self.declare_parameter("target", "turtle1").value
         self.width = int(self.declare_parameter("width", "5").value)
+
+        # callback_group = MutuallyExclusiveCallbackGroup()
 
         self.bridge = CvBridge()
         self.image = None
@@ -46,25 +53,22 @@ class Drawer(Node):
             Pose, f"/{self.target}/pose", self.get_target_pose, 10
         )
 
-    def set_color(self, r, g, b):
+    def get_target_pose(self, msg):
+        r, g, b = self.pose_to_color(msg)
+
         self.color.r = r
         self.color.g = g
         self.color.b = b
 
         self.pen_cli.call_async(self.color)
-
-    def get_target_pose(self, msg):
-        color = self.pose_to_color(msg)
-        self.set_color(*color)
+        # rclpy.spin_until_future_complete(self, future)
 
     def pose_to_color(self, msg):
         x, y = clamp(msg.x), clamp(msg.y)
-        if self.image is None:
-            return x, y, 0
         try:
             r, g, b = self.image[x, y]
             return int(b), int(g), int(r)
-        except IndexError:
+        except (IndexError, TypeError):
             return x, y, 0
 
     def get_image(self, imgmsg):
