@@ -12,7 +12,7 @@
   <depend>simple_launch</depend>
   <depend>turtlesim</depend>
   <depend>image_pipeline</depend>
-  <depend>opencv-python</depend>
+  <depend>python3-opencv</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
