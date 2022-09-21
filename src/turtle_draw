@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+
+import rclpy
+from rclpy.node import Node
+from turtlesim.msg import Pose
+from turtlesim.srv import SetPen
+from sensor_msgs.msg import Image
+import cv2
+
+MAX = 10.99
+RES = 256
+
+
+def clamp(val):
+    return int(min(max(val * 256 / MAX, 0), 256))
+
+
+class Drawer(Node):
+    def __init__(self):
+        super().__init__("drawer")
+
+        self.target = self.declare_parameter("target", "turtle1").value
+        self.width = int(self.declare_parameter("width", "5").value)
+
+        self.image = None
+        self.image_sub = self.create_subscription(
+            Image, "/camera/image_raw", self.get_image, 1
+        )
+        self.get_image(cv2.imread("HRP-2.jpg"))
+
+        # color
+        self.pen_cli = self.create_client(SetPen, f"/{self.target}/set_pen")
+        while not self.pen_cli.wait_for_service(timeout_sec=1.0):
+            print("...")
+        self.color = SetPen.Request()
+        self.color.width = self.width
+
+        # pose
+        self.target_sub = self.create_subscription(
+            Pose, f"/{self.target}/pose", self.get_target_pose, 10
+        )
+
+    def set_color(self, r, g, b):
+        self.color.r = r
+        self.color.g = g
+        self.color.b = b
+
+        self.future = self.pen_cli.call_async(self.color)
+        # rclpy.spin_until_future_complete(self, self.future)
+
+    def get_target_pose(self, msg):
+        color = self.pose_to_color(msg)
+        self.set_color(*color)
+
+    def pose_to_color(self, msg):
+        x, y = clamp(msg.x), clamp(msg.y)
+        if self.image is None:
+            return x, y, 0
+        try:
+            r, g, b = self.image[x, y]
+            return int(b), int(g), int(r)
+        except IndexError:
+            return x, y, 0
+
+    def get_image(self, image):
+        c = max(image.shape) / RES
+        image = cv2.resize(
+            image,
+            (int(image.shape[1] / c), int(image.shape[0] / c)),
+            interpolation=cv2.INTER_AREA,
+        )
+        self.image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+
+
+if __name__ == "__main__":
+    rclpy.init()
+    drawer = Drawer()
+
+    rclpy.spin(drawer)
+
+    drawer.destroy_node()
+    rclpy.shutdown()
